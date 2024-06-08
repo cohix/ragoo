@@ -1,23 +1,52 @@
 
 routes:
   - path: /k8s
-    steps:
-      - type: embedder
-        action: generate
-        ref: ollama/arctic
-        var: embedding
+    workflow:
+      ref: k8s-docs
 
-      - type: storage
-        action: lookup.vectorsimilarity
-        ref: duckdb
-        params:
-          embedding: $embedding
-        var: context
+workflows:
+  - name: k8s-docs
+    stages:
+      - name: k8s-docs-rag
+        steps:
+          - type: embedder
+            ref: ollama/arctic
+            action: generate
+            params:
+              input: $_input
+            var: embedding
 
-      - type: service
-        action: completion
-        ref: ollama/phi
-        params:
-          context: $context
-          prompt: $_prompt
-        var: _response
+          - type: storage
+            ref: duckdb/main
+            action: lookup.vectorsimilarity
+            params:
+              embedding: $embedding
+              collection: k8s
+              limit: 3
+            var: context
+
+          - type: service
+            ref: ollama/phi
+            action: completion
+            params:
+              context: $context
+              prompt: $_input
+            var: _response
+
+embedders:
+  - name: ollama/arctic
+    type: ollama
+    config:
+      model: snowflake-arctic-embed
+
+storage:
+  - name: duckdb/main
+    type: duckdb
+    config:
+      dbFilePath: .data/ragoo.db
+
+services:
+  - name: ollama/phi
+    type: ollama
+    config:
+      model: phi3

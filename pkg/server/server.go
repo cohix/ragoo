@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/cohix/ragoo/pkg/config"
@@ -25,13 +26,15 @@ func (s *Server) Start() error {
 	mux := http.NewServeMux()
 
 	for _, r := range s.config.Routes {
-		mux.HandleFunc(r.Path, handlerForRoute(r))
+		mux.HandleFunc(r.Path, s.handlerForRoute(r))
 	}
 
 	srv := &http.Server{
 		Handler: mux,
-		Addr:    ":8080",
+		Addr:    ":4141",
 	}
+
+	slog.Info("starting server", "addr", srv.Addr)
 
 	if err := srv.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to ListenAndServe: %w", err)

@@ -15,6 +15,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	slog.Info("--- Starting Ragoo --- ")
+
 	config, err := config.ReadConfigFromFile(os.Args[1])
 	if err != nil {
 		slog.Error(fmt.Errorf("failed to ReadConfigFromFile: %w", err).Error())
