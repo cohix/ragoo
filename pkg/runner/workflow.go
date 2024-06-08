@@ -16,6 +16,8 @@ import (
 const (
 	inputKey    = "_input"
 	responseKey = "_response"
+	chunkKey    = "_chunk"
+	refKey      = "_ref"
 )
 
 // Multivar represents one of several types of variables
@@ -130,7 +132,7 @@ func (r *Runner) runEmbedder(stp config.Step, vars map[string]Multivar) (*Multiv
 			return nil, "", fmt.Errorf("failed to varSubst: %w", err)
 		}
 
-		res, err := emb.Generate(input.Bytes)
+		res, err := emb.Generate(input.String)
 		if err != nil {
 			return nil, "", fmt.Errorf("embedder with ref %s resulted in error: %w", stp.Ref, err)
 		}
@@ -157,10 +159,10 @@ func (r *Runner) runStorage(stp config.Step, vars map[string]Multivar) (*Multiva
 	}
 
 	switch stp.Action {
-	case "lookup.vectorsimilarity":
+	case "lookup.cosine":
 		embeddingKey, exists := stp.Params["embedding"]
 		if !exists {
-			return nil, "", fmt.Errorf("embedder with ref %s missing param: embedding", stp.Ref)
+			return nil, "", fmt.Errorf("storage with ref %s missing param: embedding", stp.Ref)
 		}
 
 		embedding, err := varSubst(embeddingKey, vars)
@@ -170,7 +172,7 @@ func (r *Runner) runStorage(stp config.Step, vars map[string]Multivar) (*Multiva
 
 		collectionKey, exists := stp.Params["collection"]
 		if !exists {
-			return nil, "", fmt.Errorf("embedder with ref %s missing param: collection", stp.Ref)
+			return nil, "", fmt.Errorf("storage with ref %s missing param: collection", stp.Ref)
 		}
 
 		collection, err := varSubst(collectionKey, vars)
@@ -180,7 +182,7 @@ func (r *Runner) runStorage(stp config.Step, vars map[string]Multivar) (*Multiva
 
 		limitKey, exists := stp.Params["limit"]
 		if !exists {
-			return nil, "", fmt.Errorf("embedder with ref %s missing param: limit", stp.Ref)
+			return nil, "", fmt.Errorf("storage with ref %s missing param: limit", stp.Ref)
 		}
 
 		limit, err := varSubst(limitKey, vars)
@@ -193,9 +195,61 @@ func (r *Runner) runStorage(stp config.Step, vars map[string]Multivar) (*Multiva
 			return nil, "", fmt.Errorf("failed to strconv.Atoi for param: limit (must be integer): %w", err)
 		}
 
-		res, err := str.VectorSimilarity(embedding.Embedding.Embedding, collection.String, limitInt)
+		thresholdKey, exists := stp.Params["threshold"]
+		if !exists {
+			return nil, "", fmt.Errorf("storage with ref %s missing param: threshold", stp.Ref)
+		}
+
+		threshold, err := varSubst(thresholdKey, vars)
 		if err != nil {
-			return nil, "", fmt.Errorf("embedder with ref %s resulted in error: %w", stp.Ref, err)
+			return nil, "", fmt.Errorf("failed to varSubst: %w", err)
+		}
+
+		thresholdFloat, err := strconv.ParseFloat(threshold.String, 32)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to ParseFloat for param: threshold (must be decimal): %w", err)
+		}
+
+		res, err := str.LookupCosine(embedding.Embedding.Embedding, collection.String, limitInt, float32(thresholdFloat))
+		if err != nil {
+			return nil, "", fmt.Errorf("storage with ref %s resulted in error: %w", stp.Ref, err)
+		}
+
+		mult = &Multivar{Storage: res}
+	case "insert.embedding":
+		embeddingKey, exists := stp.Params["embedding"]
+		if !exists {
+			return nil, "", fmt.Errorf("storage with ref %s missing param: embedding", stp.Ref)
+		}
+
+		embedding, err := varSubst(embeddingKey, vars)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to varSubst: %w", err)
+		}
+
+		collectionKey, exists := stp.Params["collection"]
+		if !exists {
+			return nil, "", fmt.Errorf("storage with ref %s missing param: collection", stp.Ref)
+		}
+
+		collection, err := varSubst(collectionKey, vars)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to varSubst: %w", err)
+		}
+
+		refKey, exists := stp.Params["ref"]
+		if !exists {
+			return nil, "", fmt.Errorf("storage with ref %s missing param: limit", stp.Ref)
+		}
+
+		ref, err := varSubst(refKey, vars)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to varSubst: %w", err)
+		}
+
+		res, err := str.InsertEmbedding(embedding.Embedding.Embedding, collection.String, ref.String)
+		if err != nil {
+			return nil, "", fmt.Errorf("storage with ref %s resulted in error: %w", stp.Ref, err)
 		}
 
 		mult = &Multivar{Storage: res}

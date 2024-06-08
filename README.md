@@ -12,7 +12,7 @@ Plugins for various services such as vector databases, LLMs, and data importers.
 
 Composable workflows which can be exposed as simple API endpoints or run on schedules.
 
-See [the example config file](.ragoo.yaml) to get started.
+See [the example config file](./ragoo.yaml) to get started.
 
 Requires Go 1.22 to build. Default configuration uses Ollama for easy demonstration.
 

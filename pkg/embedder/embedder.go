@@ -2,7 +2,7 @@ package embedder
 
 // Embedder represents an embedder
 type Embedder interface {
-	Generate(input []byte) (*Result, error)
+	Generate(input string) (*Result, error)
 }
 
 // Result is the result of an embedder

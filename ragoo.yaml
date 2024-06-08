@@ -18,10 +18,11 @@ workflows:
 
           - type: storage
             ref: duckdb/main
-            action: lookup.vectorsimilarity
+            action: lookup.cosine
             params:
               embedding: $embedding
               collection: k8s
+              threshold: 0.75
               limit: 3
             var: context
 
@@ -50,3 +51,24 @@ services:
     type: ollama
     config:
       model: phi3
+
+importers:
+  - name: k8s-files
+    type: file
+    config:
+      directory: .files
+    steps:
+      - type: embedder
+        ref: ollama/arctic
+        action: generate
+        params:
+          input: $_chunk
+        var: embedding
+
+      - type: storage
+        ref: duckdb/main
+        action: insert.embedding
+        params:
+          embedding: $embedding
+          ref: $_ref
+          collection: k8s
