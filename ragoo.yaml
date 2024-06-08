@@ -1,0 +1,23 @@
+
+routes:
+  - path: /k8s
+    steps:
+      - type: embedder
+        action: generate
+        ref: ollama/arctic
+        var: embedding
+
+      - type: storage
+        action: lookup.vectorsimilarity
+        ref: duckdb
+        params:
+          embedding: $embedding
+        var: context
+
+      - type: service
+        action: completion
+        ref: ollama/phi
+        params:
+          context: $context
+          prompt: $_prompt
+        var: _response
