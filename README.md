@@ -1,4 +1,6 @@
-# Ragoo
+# Ragoo /ræɡˈuː/
+
+Like the pasta dish.
 
 Create Agents and RAG workflows with little to no code.
 
