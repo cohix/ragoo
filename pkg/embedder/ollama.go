@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 )
 
@@ -23,13 +22,6 @@ type embeddingResponse struct {
 
 // Generate generates embeddings for the given input
 func (o *ollamaEmbedder) Generate(input string) (*Result, error) {
-	slog.Info("generating embedding", "input", input)
-
-	// curl http://localhost:11434/api/embeddings -d '{
-	// 	"model": "mxbai-embed-large",
-	// 	"prompt": "Llamas are members of the camelid family"
-	//   }'
-
 	url := "http://localhost:11434/api/embeddings"
 
 	reqBody := &embeddingRequest{

@@ -22,16 +22,30 @@ workflows:
             params:
               embedding: $embedding
               collection: k8s
-              threshold: 0.75
+              threshold: 0.7
               limit: 3
+            var: refs
+
+          - type: importer
+            ref: k8s-files
+            action: resolve.refs
+            params:
+              refs: $refs
+              seperator: \n
             var: context
 
           - type: service
-            ref: ollama/phi
+            ref: ollama/llama
             action: completion
             params:
-              context: $context
-              prompt: $_input
+              prompt: |
+                $context
+                ----
+                Using the information above, answer the question below in 100 words or less.
+                If the answer is not contained entirely within the information provided, reply 'I do not know' without any additional text.
+                Only provide an answer to the question, do not summarize all of the information.
+                ----
+                Question: $_input
             var: _response
 
 embedders:
@@ -47,16 +61,16 @@ storage:
       dbFilePath: .data/ragoo.db
 
 services:
-  - name: ollama/phi
+  - name: ollama/llama
     type: ollama
     config:
-      model: phi3
+      model: llama3
 
 importers:
   - name: k8s-files
     type: file
     config:
-      directory: .files
+      directory: /Users/cohix-lab/workspaces/cohix/kubernetes-the-hard-way/docs/
     steps:
       - type: embedder
         ref: ollama/arctic
@@ -71,4 +85,12 @@ importers:
         params:
           embedding: $embedding
           ref: $_ref
+          batch: $_batch
           collection: k8s
+    cleanup:
+      type: storage
+      ref: duckdb/main
+      action: cleanup
+      params:
+        batch: $_batch
+        collection: k8s

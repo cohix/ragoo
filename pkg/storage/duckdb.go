@@ -18,21 +18,21 @@ type duckDBStorage struct {
 	created map[string]bool
 }
 
-func (d *duckDBStorage) InsertEmbedding(embedding []float32, collection string, ref string) (*Result, error) {
+func (d *duckDBStorage) InsertEmbedding(embedding []float32, collection string, ref string, batch string) (*Result, error) {
 	db, err := d.ensureDB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensureDB: %w", err)
 	}
 
 	if _, exists := d.created[collection]; !exists {
-		if _, err := db.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS collection_%s (embedding DOUBLE[], ref varchar);", collection)); err != nil {
+		if _, err := db.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS collection_%s (embedding DOUBLE[], ref VARCHAR, batch VARCHAR);", collection)); err != nil {
 			return nil, fmt.Errorf("failed to Exec: %w", err)
 		}
 
 		d.created[collection] = true
 	}
 
-	if _, err := db.Exec(fmt.Sprintf("INSERT INTO collection_%s (embedding, ref) VALUES (?, ?)", collection), pgvector.NewVector(embedding), ref); err != nil {
+	if _, err := db.Exec(fmt.Sprintf("INSERT INTO collection_%s (embedding, ref, batch) VALUES (?, ?, ?);", collection), pgvector.NewVector(embedding), ref, batch); err != nil {
 		return nil, fmt.Errorf("failed to Exec: %w", err)
 	}
 
@@ -45,7 +45,16 @@ func (d *duckDBStorage) LookupCosine(embedding []float32, collection string, lim
 		return nil, fmt.Errorf("failed to ensureDB: %w", err)
 	}
 
-	res, err := db.Query(fmt.Sprintf("SELECT DISTINCT ref FROM collection_%s c WHERE list_cosine_similarity(c.embedding, ?) > ? LIMIT ?;", collection), pgvector.NewVector(embedding), threshold, limit)
+	res, err := db.Query(fmt.Sprintf(`
+	SELECT ref, MAX(cosine)
+		FROM(
+				SELECT ref, list_cosine_similarity(embedding, ?) as cosine 
+				FROM collection_%s 
+				WHERE cosine > ? 
+				ORDER BY cosine DESC)
+		GROUP BY ref		
+		LIMIT ?;`, collection), pgvector.NewVector(embedding), threshold, limit)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to Exec: %w", err)
 	}
@@ -53,19 +62,36 @@ func (d *duckDBStorage) LookupCosine(embedding []float32, collection string, lim
 	defer res.Close()
 
 	result := &Result{
-		Refs: []string{},
+		Refs:    []string{},
+		Cosines: []float32{},
 	}
 
 	for res.Next() {
 		var ref string
-		if err := res.Scan(&ref); err != nil {
+		var cosine float32
+		if err := res.Scan(&ref, &cosine); err != nil {
 			return nil, fmt.Errorf("failed to res.Scan: %w", err)
 		}
 
 		result.Refs = append(result.Refs, ref)
+		result.Cosines = append(result.Cosines, cosine)
 	}
 
 	return result, nil
+}
+
+// Cleanup cleans up old data
+func (d *duckDBStorage) Cleanup(collection string, currentBatch string) error {
+	db, err := d.ensureDB()
+	if err != nil {
+		return fmt.Errorf("failed to ensureDB: %w", err)
+	}
+
+	if _, err := db.Exec(fmt.Sprintf("DELETE FROM collection_%s WHERE batch != ?;", collection), currentBatch); err != nil {
+		return fmt.Errorf("failed to Exec: %w", err)
+	}
+
+	return nil
 }
 
 func (d *duckDBStorage) ensureDB() (*sql.DB, error) {

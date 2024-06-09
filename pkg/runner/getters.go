@@ -2,6 +2,7 @@ package runner
 
 import (
 	"github.com/cohix/ragoo/pkg/embedder"
+	"github.com/cohix/ragoo/pkg/importer"
 	"github.com/cohix/ragoo/pkg/service"
 	"github.com/cohix/ragoo/pkg/storage"
 )
@@ -30,6 +31,16 @@ func (r *Runner) service(ref string) service.Service {
 	for _, srv := range r.config.Services {
 		if srv.Name == ref {
 			return service.ServiceOfType(srv.Type, srv.Config)
+		}
+	}
+
+	return nil
+}
+
+func (r *Runner) importer(ref string) importer.Importer {
+	for _, imp := range r.config.Importers {
+		if imp.Name == ref {
+			return importer.ImporterOfType(imp.Type, imp.Config)
 		}
 	}
 

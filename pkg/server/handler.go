@@ -47,12 +47,7 @@ func (s *Server) handlerForRoute(route config.Route) http.HandlerFunc {
 			return
 		}
 
-		varJSON, err := json.Marshal(result.Vars)
-		if err != nil {
-			slog.Error(fmt.Errorf("failed to Marshal vars: %w", err).Error())
-		}
-
-		slog.Info("result", "vars", string(varJSON))
+		slog.Info("workflow ran", "result", result.Response)
 
 		if err := json.NewEncoder(w).Encode(result.Response); err != nil {
 			slog.Error(fmt.Errorf("failed to NewEncoder.Encode: %w", err).Error())

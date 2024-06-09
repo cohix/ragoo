@@ -49,10 +49,11 @@ type Service struct {
 
 // Importer represents an import source and its configuration
 type Importer struct {
-	Name   string            `json:"name" yaml:"name"`
-	Type   string            `json:"type" yaml:"type"`
-	Config map[string]string `json:"config" yaml:"config"`
-	Steps  []Step            `json:"steps" yaml:"steps"`
+	Name    string            `json:"name" yaml:"name"`
+	Type    string            `json:"type" yaml:"type"`
+	Config  map[string]string `json:"config" yaml:"config"`
+	Steps   []Step            `json:"steps" yaml:"steps"`
+	Cleanup Step              `json:"cleanup" yaml:"cleanup"`
 }
 
 // Embedder represents an embedding provider and its configuration
