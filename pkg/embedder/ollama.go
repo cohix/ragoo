@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 )
 
@@ -22,6 +23,8 @@ type embeddingResponse struct {
 
 // Generate generates embeddings for the given input
 func (o *ollamaEmbedder) Generate(input string) (*Result, error) {
+	slog.Info("generating embedding", "embedder", "ollama")
+
 	url := "http://localhost:11434/api/embeddings"
 
 	reqBody := &embeddingRequest{

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 )
 
@@ -28,6 +29,8 @@ type message struct {
 }
 
 func (o *ollamaService) Completion(prompt string) (*Result, error) {
+	slog.Info("generating completion", "service", "ollama")
+
 	model, exists := o.config["model"]
 	if !exists {
 		return nil, errors.New("ollama service missing config key: model")

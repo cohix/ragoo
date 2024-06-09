@@ -1,11 +1,14 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/pgvector/pgvector-go"
 
@@ -18,34 +21,42 @@ type duckDBStorage struct {
 	created map[string]bool
 }
 
-func (d *duckDBStorage) InsertEmbedding(embedding []float32, collection string, ref string, batch string) (*Result, error) {
-	db, err := d.ensureDB()
+func (d *duckDBStorage) InsertEmbedding(collection string, ref string, embedding []float32, batch string) (*Result, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	conn, err := d.ensureDB(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensureDB: %w", err)
 	}
 
 	if _, exists := d.created[collection]; !exists {
-		if _, err := db.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS collection_%s (embedding DOUBLE[], ref VARCHAR, batch VARCHAR);", collection)); err != nil {
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS collection_%s (embedding DOUBLE[], ref VARCHAR, batch VARCHAR);", collection)); err != nil {
 			return nil, fmt.Errorf("failed to Exec: %w", err)
 		}
 
 		d.created[collection] = true
 	}
 
-	if _, err := db.Exec(fmt.Sprintf("INSERT INTO collection_%s (embedding, ref, batch) VALUES (?, ?, ?);", collection), pgvector.NewVector(embedding), ref, batch); err != nil {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("INSERT INTO collection_%s (embedding, ref, batch) VALUES (?, ?, ?);", collection), pgvector.NewVector(embedding), ref, batch); err != nil {
 		return nil, fmt.Errorf("failed to Exec: %w", err)
 	}
 
 	return &Result{}, nil
 }
 
-func (d *duckDBStorage) LookupCosine(embedding []float32, collection string, limit int, threshold float32) (*Result, error) {
-	db, err := d.ensureDB()
+func (d *duckDBStorage) LookupCosine(collection string, embedding []float32, limit int, threshold float32) (*Result, error) {
+	slog.Info("cosine lookup", "storage", "duckdb")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	conn, err := d.ensureDB(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensureDB: %w", err)
 	}
 
-	res, err := db.Query(fmt.Sprintf(`
+	res, err := conn.QueryContext(ctx, fmt.Sprintf(`
 	SELECT ref, MAX(cosine) as max_cosine
 		FROM(
 				SELECT ref, list_cosine_similarity(embedding, ?) as cosine 
@@ -82,20 +93,23 @@ func (d *duckDBStorage) LookupCosine(embedding []float32, collection string, lim
 }
 
 // Cleanup cleans up old data
-func (d *duckDBStorage) Cleanup(collection string, currentBatch string) error {
-	db, err := d.ensureDB()
+func (d *duckDBStorage) Cleanup(collection string, batch string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	conn, err := d.ensureDB(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to ensureDB: %w", err)
 	}
 
-	if _, err := db.Exec(fmt.Sprintf("DELETE FROM collection_%s WHERE batch != ?;", collection), currentBatch); err != nil {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("DELETE FROM collection_%s WHERE batch != ?;", collection), batch); err != nil {
 		return fmt.Errorf("failed to Exec: %w", err)
 	}
 
 	return nil
 }
 
-func (d *duckDBStorage) ensureDB() (*sql.DB, error) {
+func (d *duckDBStorage) ensureDB(ctx context.Context) (*sql.Conn, error) {
 	if d.db == nil {
 		dbFile, exists := d.config["dbFilePath"]
 		if !exists {
@@ -114,5 +128,10 @@ func (d *duckDBStorage) ensureDB() (*sql.DB, error) {
 		d.db = db
 	}
 
-	return d.db, nil
+	conn, err := d.db.Conn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to db.Conn: %w", err)
+	}
+
+	return conn, nil
 }

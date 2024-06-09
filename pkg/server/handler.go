@@ -47,7 +47,7 @@ func (s *Server) handlerForRoute(route config.Route) http.HandlerFunc {
 			return
 		}
 
-		slog.Info("workflow ran", "result", result.Response)
+		slog.Info("workflow completed", "name", route.Workflow.Ref)
 
 		if err := json.NewEncoder(w).Encode(result.Response); err != nil {
 			slog.Error(fmt.Errorf("failed to NewEncoder.Encode: %w", err).Error())

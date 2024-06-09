@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/cohix/ragoo/pkg/config"
@@ -95,6 +96,57 @@ func (r *Runner) StartImporter(imp config.Importer) error {
 			time.Sleep(time.Minute * 5)
 		}
 	}()
+
+	return nil
+}
+
+func (r *Runner) runImporter(stp config.Step, vars map[string]Multivar) (*Multivar, string, error) {
+	var mult *Multivar
+
+	imp := r.importer(stp.Ref)
+	if imp == nil {
+		return nil, "", fmt.Errorf("importer with ref %s not found", stp.Ref)
+	}
+
+	switch stp.Action {
+	case "resolve.refs":
+		refs, err := resolveParam("refs", stp.Params, vars, false)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to resolveParam 'refs' for importer: %w", err)
+		}
+
+		res, err := imp.ResolveRefs(*refs.Storage)
+		if err != nil {
+			return nil, "", fmt.Errorf("importer with ref %s resulted in error: %w", stp.Ref, err)
+		}
+
+		seperator := " "
+		sep, exists := stp.Params["seperator"]
+		if exists {
+			seperator = sep
+		}
+
+		combined := strings.Join(res.Documents, seperator)
+
+		mult = &Multivar{Importer: res, String: combined, Bytes: []byte(combined)}
+	default:
+		return nil, "", fmt.Errorf("importer with ref %s called with invalid action %s", stp.Ref, stp.Action)
+	}
+
+	key := "importer"
+	if stp.Var != "" {
+		key = stp.Var
+	}
+
+	return mult, key, nil
+}
+
+func (r *Runner) importer(ref string) importer.Importer {
+	for _, imp := range r.config.Importers {
+		if imp.Name == ref {
+			return importer.ImporterOfType(imp.Type, imp.Config)
+		}
+	}
 
 	return nil
 }
