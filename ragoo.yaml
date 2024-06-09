@@ -22,8 +22,8 @@ workflows:
             params:
               embedding: $embedding
               collection: k8s
-              threshold: 0.7
-              limit: 3
+              threshold: 0.65
+              limit: 2
             var: refs
 
           - type: importer

@@ -46,13 +46,14 @@ func (d *duckDBStorage) LookupCosine(embedding []float32, collection string, lim
 	}
 
 	res, err := db.Query(fmt.Sprintf(`
-	SELECT ref, MAX(cosine)
+	SELECT ref, MAX(cosine) as max_cosine
 		FROM(
 				SELECT ref, list_cosine_similarity(embedding, ?) as cosine 
 				FROM collection_%s 
 				WHERE cosine > ? 
-				ORDER BY cosine DESC)
-		GROUP BY ref		
+			)
+		GROUP BY ref
+		ORDER BY max_cosine DESC
 		LIMIT ?;`, collection), pgvector.NewVector(embedding), threshold, limit)
 
 	if err != nil {

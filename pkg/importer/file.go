@@ -48,7 +48,7 @@ func (f *fileImporter) Run(batch string, resChan chan Result) error {
 
 		r := Result{
 			Ref:    path,
-			Chunks: chunks,
+			Chunks: append(chunks, filepath.Base(path)), // include the filename in semantic search
 			Batch:  batch,
 		}
 
